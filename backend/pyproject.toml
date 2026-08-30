@@ -1,0 +1,36 @@
+[project]
+name = "gurugram-commons-backend"
+version = "0.1.0"
+description = "Event intelligence API and worker for Gurugram Commons."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116.0",
+  "uvicorn[standard]>=0.35.0",
+  "sqlalchemy>=2.0.40",
+  "psycopg[binary]>=3.2.0",
+  "alembic>=1.16.0",
+  "pgvector>=0.4.0",
+  "pydantic-settings>=2.10.0",
+  "openai>=1.99.0",
+  "httpx>=0.28.0",
+  "beautifulsoup4>=4.13.0",
+  "apscheduler>=3.11.0",
+  "python-dotenv>=1.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "core*", "worker*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
