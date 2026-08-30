@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/mock_intelligence.dart';
 import '../models/event_intelligence.dart';
 import '../models/event_item.dart';
 import '../services/api_client.dart';
+import '../state/app_state.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_typography.dart';
 import '../widgets/ask_sheet.dart';
+import '../widgets/event_briefing.dart';
 import '../widgets/evidence_sheet.dart';
 import '../widgets/primitives.dart';
 import '../widgets/verdict_card.dart';
@@ -60,6 +63,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   EventVerdict? _verdict;
   EventSeries? _series;
+  EventItem? _hydrated;
   List<EventItem> _similar = const [];
   bool _loading = true;
   bool _failed = false;
@@ -82,6 +86,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       setState(() {
         _verdict = detail.verdict;
         _series = detail.series;
+        _hydrated = detail.event.copyWith(fitPercent: widget.event.fitPercent);
         _loading = false;
         _isSample = false;
       });
@@ -111,7 +116,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final e = widget.event;
+    final profile = context.watch<AppState>().profile;
+    final e = _hydrated ?? widget.event;
     // Locals so Dart can promote them to non-null; instance fields cannot be.
     final verdict = _verdict;
     final series = _series;
@@ -156,6 +162,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 Reveal(
                   delay: Motion.stagger(1),
                   child: _Venue(event: e),
+                ),
+                const SizedBox(height: Space.s32),
+                Reveal(
+                  delay: Motion.stagger(2),
+                  child: EventBriefing(
+                    event: e,
+                    profile: profile,
+                    verdict: verdict,
+                  ),
                 ),
                 const SizedBox(height: Space.s32),
 

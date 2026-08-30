@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from core.geo import classify_geocode, is_gurugram_event
+from core.guest_count import extract_guest_count, guest_count_source_for
 from worker.sources.base import DiscoveredEvent
 from worker.sources.parse import (
     collect_events,
@@ -124,6 +125,10 @@ def _from_schema(raw: dict[str, Any], page_url: str) -> DiscoveredEvent | None:
         geocode_quality=quality,
         organizer_name="CommunityMeetups",
         organizer_ref="communitymeetups",
+        guest_count=extract_guest_count(raw if isinstance(raw, dict) else {}),
+        guest_count_source=guest_count_source_for("community")
+        if extract_guest_count(raw if isinstance(raw, dict) else {})
+        else None,
         raw=raw if isinstance(raw, dict) else {"url": page_url},
     )
 

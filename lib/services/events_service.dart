@@ -109,5 +109,9 @@ class EventsService {
         'verdictBand': e.verdictBand,
         'verdictFormat': e.verdictFormat,
         'hasVerdict': e.hasVerdict,
+        'about': e.about,
+        'guestCount': e.guestCount,
+        'guestCountSource': e.guestCountSource,
+        'guestCountAt': e.guestCountAt?.toIso8601String(),
       };
 }

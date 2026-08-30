@@ -102,6 +102,9 @@ class Event(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="upcoming", server_default=sa_text("'upcoming'"))
     raw: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(JSON)
+    guest_count: Mapped[int | None] = mapped_column(Integer)
+    guest_count_source: Mapped[str | None] = mapped_column(Text)
+    guest_count_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     first_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=lambda: datetime.now(UTC), server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=lambda: datetime.now(UTC), server_default=func.now())
 

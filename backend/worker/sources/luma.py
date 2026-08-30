@@ -6,6 +6,7 @@ import httpx
 
 from core.config import get_settings
 from core.geo import classify_geocode, is_gurugram_event
+from core.guest_count import extract_guest_count, guest_count_source_for
 from worker.sources.base import DiscoveredEvent
 from worker.sources.parse import canonical_luma_url, first, number_of, parse_dt, text_of
 
@@ -77,6 +78,7 @@ def _from_luma_api(raw: dict[str, Any]) -> DiscoveredEvent | None:
     ):
         return None
     host = raw.get("calendar") or raw.get("host") or {}
+    going = extract_guest_count(raw)
     return DiscoveredEvent(
         source_id="luma",
         source_event_id=first(raw.get("api_id"), url),
@@ -95,6 +97,8 @@ def _from_luma_api(raw: dict[str, Any]) -> DiscoveredEvent | None:
         organizer_name=first(host.get("name"), host.get("title")) or None,
         organizer_ref=first(host.get("slug"), host.get("api_id")) or None,
         organizer_url=first(host.get("url")) or None,
+        guest_count=going,
+        guest_count_source=guest_count_source_for("luma") if going else None,
         raw=raw,
     )
 

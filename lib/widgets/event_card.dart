@@ -140,6 +140,11 @@ class EventCard extends StatelessWidget {
                       style: AppType.bodyS(color: p.inkMuted),
                     ),
                   ),
+                  if (event.guestCount != null) ...[
+                    const SizedBox(width: Space.s8),
+                    Text('${event.guestCount} GOING',
+                        style: AppType.labelS(color: p.inkMuted)),
+                  ],
                   if (event.fitPercent != null) ...[
                     const SizedBox(width: Space.s8),
                     Text('${event.fitPercent}% FIT',

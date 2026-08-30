@@ -17,6 +17,10 @@ class EventItem {
     this.verdictBand,
     this.verdictFormat,
     this.hasVerdict = false,
+    this.about = '',
+    this.guestCount,
+    this.guestCountSource,
+    this.guestCountAt,
   });
 
   final String id;
@@ -42,6 +46,12 @@ class EventItem {
   /// rather than only its confidence.
   final String? verdictFormat;
   final bool hasVerdict;
+
+  /// Short sourced briefing. Empty when we only have a title.
+  final String about;
+  final int? guestCount;
+  final String? guestCountSource;
+  final DateTime? guestCountAt;
 
   bool get hasRealCoords {
     if (lat == null || lng == null) return false;
@@ -71,6 +81,9 @@ class EventItem {
       url: json['url']?.toString() ?? '',
       source: json['source']?.toString() ?? 'Luma',
       geocoded: json['geocoded']?.toString(),
+      about: (json['about'] ?? json['description'] ?? '').toString(),
+      guestCount: (json['guestCount'] as num?)?.toInt() ??
+          (json['guest_count'] as num?)?.toInt(),
     );
   }
 
@@ -100,10 +113,24 @@ class EventItem {
       verdictBand: json['verdictBand']?.toString(),
       verdictFormat: json['verdictFormat']?.toString(),
       hasVerdict: json['hasVerdict'] == true,
+      about: json['about']?.toString() ?? '',
+      guestCount: (json['guestCount'] as num?)?.toInt(),
+      guestCountSource: json['guestCountSource']?.toString(),
+      guestCountAt: DateTime.tryParse(json['guestCountAt']?.toString() ?? ''),
     );
   }
 
-  EventItem copyWith({int? fitPercent}) => EventItem(
+  EventItem copyWith({
+    int? fitPercent,
+    String? about,
+    int? guestCount,
+    String? guestCountSource,
+    DateTime? guestCountAt,
+    String? verdictBand,
+    String? verdictFormat,
+    bool? hasVerdict,
+  }) =>
+      EventItem(
         id: id,
         title: title,
         start: start,
@@ -118,8 +145,12 @@ class EventItem {
         source: source,
         geocoded: geocoded,
         fitPercent: fitPercent ?? this.fitPercent,
-        verdictBand: verdictBand,
-        verdictFormat: verdictFormat,
-        hasVerdict: hasVerdict,
+        verdictBand: verdictBand ?? this.verdictBand,
+        verdictFormat: verdictFormat ?? this.verdictFormat,
+        hasVerdict: hasVerdict ?? this.hasVerdict,
+        about: about ?? this.about,
+        guestCount: guestCount ?? this.guestCount,
+        guestCountSource: guestCountSource ?? this.guestCountSource,
+        guestCountAt: guestCountAt ?? this.guestCountAt,
       );
 }

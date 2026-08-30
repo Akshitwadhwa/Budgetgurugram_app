@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from core.about import compose_about
 from core.confidence import confidence_band
+from core.guest_count import extract_guest_count, guest_count_source_for
 from core.models import Event, EventEnrichment, Series
 
 from app.schemas.events import (
@@ -18,10 +20,21 @@ def event_source_label(event: Event) -> str:
     return event.source_id.title()
 
 
+def _guest_fields(event: Event) -> tuple[int | None, str | None, object]:
+    if event.guest_count is not None:
+        return event.guest_count, event.guest_count_source, event.guest_count_at
+    found = extract_guest_count(event.raw if isinstance(event.raw, dict) else {})
+    if found is None:
+        return None, None, None
+    return found, guest_count_source_for(event.source_id), event.last_seen_at
+
+
 def to_event_summary(event: Event) -> EventSummary:
     lat, lng = event.lat, event.lng
     if event.geocode_quality in {"city-default", "unlocated"}:
         lat, lng = None, None
+    expect = event.enrichment.expect if event.enrichment else ""
+    going, going_source, going_at = _guest_fields(event)
     return EventSummary(
         id=str(event.id),
         title=event.title,
@@ -38,6 +51,10 @@ def to_event_summary(event: Event) -> EventSummary:
         description=event.description_raw or "",
         city=event.city,
         series_id=str(event.series_id) if event.series_id else None,
+        about=compose_about(event.description_raw or "", expect),
+        guest_count=going,
+        guest_count_source=going_source,
+        guest_count_at=going_at,
     )
 
 

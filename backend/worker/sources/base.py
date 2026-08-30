@@ -25,6 +25,8 @@ class DiscoveredEvent:
     organizer_name: str | None = None
     organizer_ref: str | None = None
     organizer_url: str | None = None
+    guest_count: int | None = None
+    guest_count_source: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 

@@ -28,6 +28,10 @@ class EventSummary(APIModel):
     description: str = ""
     city: str = "Gurugram"
     series_id: str | None = None
+    about: str = ""
+    guest_count: int | None = None
+    guest_count_source: str | None = None
+    guest_count_at: datetime | None = None
 
 
 class EventListItem(EventSummary):

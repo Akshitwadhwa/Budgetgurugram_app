@@ -89,6 +89,10 @@ def upsert_event(session: Session, item: DiscoveredEvent) -> bool:
         existing.city = item.city
         existing.raw = item.raw
         existing.last_seen_at = now
+        if item.guest_count is not None:
+            existing.guest_count = item.guest_count
+            existing.guest_count_source = item.guest_count_source
+            existing.guest_count_at = now
         if organizer:
             existing.organizer_id = organizer.id
         return False
@@ -112,6 +116,9 @@ def upsert_event(session: Session, item: DiscoveredEvent) -> bool:
         status="upcoming",
         raw=item.raw,
         organizer_id=organizer.id if organizer else None,
+        guest_count=item.guest_count,
+        guest_count_source=item.guest_count_source,
+        guest_count_at=now if item.guest_count is not None else None,
         first_seen_at=now,
         last_seen_at=now,
     )
