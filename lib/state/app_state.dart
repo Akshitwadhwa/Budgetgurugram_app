@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart';
 
 import '../data/curated_places.dart';
 import '../models/event_item.dart';
@@ -100,13 +100,29 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> useCurrentLocation() async {
-    final permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    final location = Location();
+    if (!await location.serviceEnabled() && !await location.requestService()) {
+      toast = 'Location services are off. Using Cyber City.';
+      notifyListeners();
+      return;
+    }
+    var permission = await location.hasPermission();
+    if (permission == PermissionStatus.denied) {
+      permission = await location.requestPermission();
+    }
+    if (permission == PermissionStatus.denied || permission == PermissionStatus.deniedForever) {
       toast = 'Location permission denied. Using Cyber City.';
       notifyListeners();
       return;
     }
-    final position = await Geolocator.getCurrentPosition();
+    final LocationData position;
+    try {
+      position = await location.getLocation();
+    } catch (_) {
+      toast = 'Could not get your location. Using Cyber City.';
+      notifyListeners();
+      return;
+    }
     profile = profile.copyWith(
       locationMode: 'current',
       lat: position.latitude,

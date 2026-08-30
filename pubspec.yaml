@@ -9,16 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  google_fonts: ^6.3.2
-  provider: ^6.1.5
-  http: ^1.5.0
-  shared_preferences: ^2.5.3
-  geolocator: ^14.0.2
-  flutter_map: ^8.2.1
-  latlong2: ^0.9.1
+  cupertino_icons: ^1.0.9
+  google_fonts: ^8.2.1
+  provider: ^6.1.5+1
+  http: ^1.6.0
+  shared_preferences: ^2.5.5
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
   url_launcher: ^6.3.2
-  intl: ^0.20.2
+  intl: ^0.20.3
+  location: ^10.0.2
 
 dev_dependencies:
   flutter_test:

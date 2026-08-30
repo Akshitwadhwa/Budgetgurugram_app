@@ -1,4 +1,4 @@
-package com.gurugramcommons.gurugram_commons
+package com.example.budget
 
 import io.flutter.embedding.android.FlutterActivity
 
