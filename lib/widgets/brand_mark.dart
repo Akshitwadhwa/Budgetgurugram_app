@@ -1,32 +1,69 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../theme/app_colors.dart';
+import '../theme/app_palette.dart';
+import '../theme/app_tokens.dart';
+import '../theme/app_typography.dart';
 
+/// The wordmark.
+///
+/// The monogram is a serif **G** inside a hairline circle — a stamp, in the
+/// postal sense. It reads as something applied to a document after it has been
+/// checked, which is the whole promise: this listing has been looked at.
+///
+/// "BUDGET" is set in mono above the serif "Gurugram", so the two halves of the
+/// name carry the two halves of the product — the plain, priced, factual part
+/// and the city itself.
 class BrandMark extends StatelessWidget {
-  const BrandMark({super.key, this.light = false});
+  const BrandMark({super.key, this.light = false, this.compact = false});
+
+  /// Renders for a dark ground (onboarding's forest panel), independent of the
+  /// app's light/dark theme.
   final bool light;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final color = light ? const Color(0xFFFBF9F2) : AppColors.forest;
+    final p = context.palette;
+    final color = light ? const Color(0xFFF7F4ED) : p.ink;
+    final subdued = light ? const Color(0xFFAFC4BB) : p.inkFaint;
+
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 34,
-          height: 34,
+          width: compact ? 28 : 34,
+          height: compact ? 28 : 34,
           alignment: Alignment.center,
-          decoration: BoxDecoration(border: Border.all(color: color), shape: BoxShape.circle),
-          child: Text('C', style: GoogleFonts.instrumentSerif(fontSize: 20, fontStyle: FontStyle.italic, color: color)),
+          decoration: BoxDecoration(
+            border: Border.all(color: color, width: Strokes.hair),
+            shape: BoxShape.circle,
+          ),
+          child: Transform.translate(
+            offset: const Offset(0, -1),
+            child: Text(
+              'G',
+              style: AppType.titleL(color: color).copyWith(
+                fontSize: compact ? 15 : 18,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
         ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Gurugram', style: GoogleFonts.dmSans(fontWeight: FontWeight.w700, fontSize: 14, color: color)),
-            Text('COMMONS', style: GoogleFonts.dmSans(fontSize: 8, letterSpacing: 2.2, fontWeight: FontWeight.w700, color: color)),
-          ],
-        ),
+        if (!compact) ...[
+          const SizedBox(width: Space.s8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('BUDGET', style: AppType.labelS(color: subdued)),
+              const SizedBox(height: 1),
+              Text(
+                'Gurugram',
+                style: AppType.titleL(color: color).copyWith(fontSize: 19),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

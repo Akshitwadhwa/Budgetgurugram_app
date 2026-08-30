@@ -13,6 +13,8 @@ Two processes, one codebase:
 
 ## Local setup
 
+### macOS / Linux
+
 ```bash
 cd backend
 python3 -m venv .venv
@@ -21,11 +23,47 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Point `DATABASE_URL` at Supabase (or local Postgres 15 with `pgvector` + `pg_trgm`).
+### Windows (PowerShell)
+
+`source` is not a PowerShell command, and the activate script lives at a
+different path. Either activate:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1      # not source .venv/bin/activate
+pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+…or skip activation entirely and call the venv's interpreter directly. This is
+the more reliable option, because it cannot silently install into the wrong
+Python and does not depend on `Scripts\` being on `PATH`:
+
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+> **If `Activate.ps1` is blocked** by execution policy:
+> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
+>
+> **If `alembic` / `uvicorn` are "not recognized"**, their `Scripts\` directory
+> is not on `PATH`. Always invoke them as modules — `python -m alembic`,
+> `python -m uvicorn` — which works regardless of `PATH`.
+
+### Then, on every platform
+
+Point `DATABASE_URL` at Supabase (or local Postgres 15 with `pgvector` +
+`pg_trgm`). The value in `.env.example` is a **placeholder** — a local install
+will have its own password, and `postgres:postgres` will fail with
+`password authentication failed for user "postgres"`.
 
 ```bash
-alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+alembic upgrade head                          # or: python -m alembic upgrade head
+uvicorn app.main:app --reload --port 8000     # or: python -m uvicorn app.main:app --reload --port 8000
 ```
 
 In another terminal:

@@ -5,7 +5,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "format_eval.json"
 
 
 def test_eval_set_is_labelled_and_sized():
-    rows = json.loads(FIXTURE.read_text())
+    rows = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert len(rows) == 30
     allowed = {
         "workshop",

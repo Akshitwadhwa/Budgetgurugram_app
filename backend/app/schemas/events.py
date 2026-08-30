@@ -33,6 +33,10 @@ class EventSummary(APIModel):
 class EventListItem(EventSummary):
     verdict_band: str | None = None
     has_verdict: bool = False
+    # Carried on the list so a card can show the reading itself
+    # ("Likely a workshop"), not just how confident we are. Without it the
+    # list can only show a confidence with nothing to be confident about.
+    verdict_format: str | None = None
 
 
 class EventListResponse(APIModel):

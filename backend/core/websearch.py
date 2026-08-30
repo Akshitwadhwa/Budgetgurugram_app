@@ -72,7 +72,11 @@ def search_web(query: str, session: Session, run: IngestRun | None, limit: int =
     return hits
 
 
-def html_to_text(html: str) -> tuple[str, str]:
+def html_to_text(html: str | bytes) -> tuple[str, str]:
+    # Parse from raw bytes where possible so BeautifulSoup can detect the
+    # charset from the document's own meta tags. httpx's `.text` guesses from
+    # headers alone and silently mangles en-dashes and smart quotes into U+FFFD,
+    # which then end up inside evidence quotes shown to users.
     soup = BeautifulSoup(html, "html.parser")
     title = soup.title.get_text(strip=True) if soup.title else ""
     for tag in soup(["script", "style", "noscript"]):
@@ -88,15 +92,24 @@ def fetch_page(url: str) -> FetchedPage | None:
     except Exception as exc:
         log.warning("fetch failed for %s: %s", url, exc)
         return None
-    title, content = html_to_text(response.text)
+    title, content = html_to_text(response.content)
     if not content:
         return None
     return FetchedPage(url=str(response.url), title=title, content=content, content_hash=_hash(content))
 
 
 def cache_document(session: Session, page: FetchedPage) -> WebDocument:
-    existing = session.scalar(select(WebDocument).where(WebDocument.url == page.url))
     now = datetime.now(timezone.utc)
+
+    # Objects added earlier in this transaction are not yet visible to a SELECT,
+    # so a URL reached twice in one research pass (e.g. the same organiser page
+    # returned by two different queries) would be inserted twice and violate the
+    # unique index on flush. Check the pending set first.
+    for pending in session.new:
+        if isinstance(pending, WebDocument) and pending.url == page.url:
+            return pending
+
+    existing = session.scalar(select(WebDocument).where(WebDocument.url == page.url))
     if existing and existing.content_hash == page.content_hash and existing.fetched_at > now - CACHE_TTL:
         return existing
     if existing:

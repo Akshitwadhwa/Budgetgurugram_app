@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(
-        default="postgresql+psycopg://postgres:postgres@localhost:5432/gurugram_commons",
+        default="sqlite:///./data/budget_gurugram.db",
         validation_alias=AliasChoices("DATABASE_URL", "database_url"),
     )
     openai_api_key: str = Field(default="", validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"))

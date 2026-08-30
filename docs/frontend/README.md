@@ -1,8 +1,34 @@
 # Frontend — Event Intelligence
 
-Flutter changes for the event-intelligence slice. Decisions live in
+Flutter implementation for the event-intelligence slice. Decisions live in
 [the design spec](../superpowers/specs/2026-08-30-event-intelligence-design.md);
-the API contract is in [`docs/backend/README.md §4`](../backend/README.md).
+the API contract is in [`docs/backend/README.md §4`](../backend/README.md); the
+visual system and its reasoning are in [`DESIGN.md`](./DESIGN.md).
+
+## Status
+
+**Built and passing** (`flutter analyze` clean, 13 tests green):
+
+- Full design-token system — `app_tokens`, `app_palette` (light + dark via
+  `ThemeExtension`), `app_typography`, `app_theme`
+- `ConfidenceMeter`, `DashedBorderPainter`, `VerdictCard`, `VerdictPendingCard`,
+  `EvidenceSheet`, `AskSheet`, `Reveal`, `Skeleton`, `SectionLabel`, `MetaPill`
+- `EventDetailScreen` — the screen that replaces bouncing users out to Luma
+- Mapbox tiles + custom-drawn `MapPin` / `ClusterPin` / `UserLocationPin`
+- Every screen migrated off the legacy palette; `app_colors.dart` deleted
+- Renamed throughout to **Budget Gurugram** (Dart package, Android label,
+  iOS bundle name, wordmark)
+- `verdict_test.dart` — trust-model invariants
+
+**Running on fixtures.** `lib/data/mock_intelligence.dart` stands in for the
+backend: deterministic (stable hash, not `Random()`), and weighted so all three
+confidence bands plus the no-verdict state appear in any demo. Swapping it for
+a real `ApiClient` touches that one file — the widget layer takes an
+`EventVerdict` and never learns where it came from.
+
+**Not built yet:** `ApiClient`, `DeviceService`, the `AppState` split (§6), the
+offline response cache. Those are backend-dependent or pure refactors and are
+listed in §10.
 
 ---
 

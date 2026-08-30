@@ -49,6 +49,7 @@ def to_list_item(event: Event) -> EventListItem:
         **summary.model_dump(),
         verdict_band=band,
         has_verdict=enrichment is not None,
+        verdict_format=enrichment.true_format if enrichment else None,
     )
 
 

@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/place.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_palette.dart';
+import '../theme/app_tokens.dart';
+import '../theme/app_typography.dart';
+import 'primitives.dart';
 
+/// Place detail.
+///
+/// The old sheet opened with a 120px block of flat colour carrying the name in
+/// white. This version leads with the facts — price, distance, category — set
+/// as a small data table, because someone opening this sheet has already
+/// decided they are interested and now wants specifics.
+///
+/// The sourcing footer is not boilerplate. Curated entries carry a real
+/// "confirm before visiting" caveat, and saying so is the same rule the event
+/// verdicts follow.
 Future<void> showPlaceSheet({
   required BuildContext context,
   required Place place,
@@ -15,59 +27,191 @@ Future<void> showPlaceSheet({
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.cream,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-    builder: (context) {
-      final color = Color(int.parse(place.accent.replaceFirst('#', '0xFF')));
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(4)))),
-            const SizedBox(height: 16),
-            Container(
-              height: 120,
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
-              alignment: Alignment.bottomLeft,
-              child: Text(place.name, style: GoogleFonts.instrumentSerif(color: Colors.white, fontSize: 32)),
-            ),
-            const SizedBox(height: 16),
-            Text(place.name, style: GoogleFonts.dmSans(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.forest)),
-            Text('${place.area} · ${distanceKm.toStringAsFixed(1)} km from you', style: const TextStyle(color: AppColors.muted)),
-            const SizedBox(height: 12),
-            Text(place.description, style: const TextStyle(color: AppColors.muted, height: 1.5)),
-            const SizedBox(height: 16),
-            Text(place.open, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onSave,
-                    child: Text(saved ? '♥ Saved' : '♡ Save place'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      final q = Uri.encodeComponent('${place.name}, ${place.area}, Gurugram');
-                      launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$q'), mode: LaunchMode.externalApplication);
-                    },
-                    child: const Text('Directions'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text('Confirm hours and price before travelling · ${place.source}', style: const TextStyle(color: AppColors.muted, fontSize: 11)),
-          ],
-        ),
-      );
-    },
+    useSafeArea: true,
+    builder: (context) => _PlaceSheet(
+      place: place,
+      distanceKm: distanceKm,
+      saved: saved,
+      onSave: onSave,
+    ),
   );
+}
+
+class _PlaceSheet extends StatefulWidget {
+  const _PlaceSheet({
+    required this.place,
+    required this.distanceKm,
+    required this.saved,
+    required this.onSave,
+  });
+
+  final Place place;
+  final double distanceKm;
+  final bool saved;
+  final VoidCallback onSave;
+
+  @override
+  State<_PlaceSheet> createState() => _PlaceSheetState();
+}
+
+class _PlaceSheetState extends State<_PlaceSheet> {
+  late bool _saved = widget.saved;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final place = widget.place;
+    final category = place.category == 'food' &&
+            RegExp(r'coffee|cafe|café', caseSensitive: false)
+                .hasMatch(place.name)
+        ? 'coffee'
+        : place.category;
+    final accent = p.categoryColor(category);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.72,
+      minChildSize: 0.4,
+      maxChildSize: 0.94,
+      builder: (context, controller) => ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(
+            Space.gutter, Space.s12, Space.gutter, Space.s32),
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: p.borderStrong,
+                borderRadius: Radii.rPill,
+              ),
+            ),
+          ),
+          const SizedBox(height: Space.s20),
+          Text(place.categoryLabel.toUpperCase(),
+              style: AppType.label(color: accent)),
+          const SizedBox(height: Space.s8),
+          Text(place.name, style: AppType.display(color: p.ink)),
+
+          if (place.description.isNotEmpty) ...[
+            const SizedBox(height: Space.s16),
+            Text(place.description, style: AppType.bodyL(color: p.inkMuted)),
+          ],
+
+          const SizedBox(height: Space.s24),
+          // Facts as a table, not prose. Mono values line up into a column the
+          // eye can scan without reading.
+          _Row(label: 'Price', value: place.price, mono: true),
+          _Row(label: 'Per', value: place.priceType),
+          _Row(label: 'Area', value: place.area),
+          _Row(
+            label: 'Distance',
+            value: '${widget.distanceKm.toStringAsFixed(1)} km',
+            mono: true,
+          ),
+          _Row(label: 'Hours', value: place.open),
+
+          if (place.tags.isNotEmpty) ...[
+            const SizedBox(height: Space.s20),
+            Wrap(
+              spacing: Space.s6,
+              runSpacing: Space.s6,
+              children: [for (final t in place.tags) MetaPill(t)],
+            ),
+          ],
+
+          const SizedBox(height: Space.s24),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _saved = !_saved);
+                    widget.onSave();
+                  },
+                  icon: Icon(
+                    _saved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    size: 17,
+                    color: _saved ? p.gold : p.ink,
+                  ),
+                  label: Text(_saved ? 'Saved' : 'Save'),
+                ),
+              ),
+              const SizedBox(width: Space.s8),
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    final q = Uri.encodeComponent(
+                        '${place.name}, ${place.area}, Gurugram');
+                    launchUrl(
+                      Uri.parse(
+                          'https://www.google.com/maps/search/?api=1&query=$q'),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  icon: const Icon(Icons.directions_rounded, size: 17),
+                  label: const Text('Directions'),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: Space.s24),
+          const Hairline(),
+          const SizedBox(height: Space.s12),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 13, color: p.inkFaint),
+              const SizedBox(width: Space.s6),
+              Expanded(
+                child: Text(
+                  'Source: ${place.source}. Confirm hours and price before you travel.',
+                  style: AppType.bodyS(color: p.inkFaint),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
+  const _Row({required this.label, required this.value, this.mono = false});
+
+  final String label;
+  final String value;
+  final bool mono;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.s12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(label.toUpperCase(),
+                style: AppType.labelS(color: p.inkFaint)),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: mono
+                  ? AppType.numeric(
+                      color: p.ink, size: 13, weight: FontWeight.w700)
+                  : AppType.body(color: p.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

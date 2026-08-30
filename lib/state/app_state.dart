@@ -73,6 +73,13 @@ class AppState extends ChangeNotifier {
     ]);
   }
 
+  /// True when the last event load came from the live backend rather than the
+  /// on-device cache or the bundled fixture. Surfaced in Profile so the app can
+  /// say which rung of the degradation chain it is on.
+  bool get eventsAreLive => _eventsService.lastLoadWasLive;
+
+  DateTime? get eventsLoadedAt => _eventsService.lastLoadedAt;
+
   Future<void> loadEvents() async {
     events = await _eventsService.load(role: profile.role);
     notifyListeners();

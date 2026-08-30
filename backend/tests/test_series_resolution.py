@@ -8,7 +8,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "series_golden.json"
 
 
 def test_golden_title_pairs_do_not_merge_distinct_series():
-    pairs = json.loads(FIXTURE.read_text())
+    pairs = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert len(pairs) >= 40
     failures = []
     for pair in pairs:

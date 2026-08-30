@@ -1,5 +1,5 @@
-name: gurugram_commons
-description: A local-first Gurugram guide for places, workspaces and events.
+name: budget_gurugram
+description: "Budget Gurugram — what is actually happening in the city, with sources."
 publish_to: "none"
 version: 1.0.0+1
 

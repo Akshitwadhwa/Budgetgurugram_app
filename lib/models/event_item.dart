@@ -14,6 +14,9 @@ class EventItem {
     this.source = 'Luma',
     this.geocoded,
     this.fitPercent,
+    this.verdictBand,
+    this.verdictFormat,
+    this.hasVerdict = false,
   });
 
   final String id;
@@ -30,6 +33,15 @@ class EventItem {
   final String source;
   final String? geocoded;
   final int? fitPercent;
+
+  /// Verdict summary carried on the *list* response so a card can show the
+  /// reading without a second request per event. Null means no verdict yet.
+  final String? verdictBand;
+
+  /// The verdict itself ("workshop", "talk"), so a card can state the reading
+  /// rather than only its confidence.
+  final String? verdictFormat;
+  final bool hasVerdict;
 
   bool get hasRealCoords {
     if (lat == null || lng == null) return false;
@@ -62,6 +74,35 @@ class EventItem {
     );
   }
 
+  /// Maps the `/v1/events` response, which uses different field names from the
+  /// legacy Vercel feed and the bundled offline fixture.
+  factory EventItem.fromApi(Map<String, dynamic> json) {
+    final venue = json['venueName']?.toString();
+    final address = json['address']?.toString();
+    return EventItem(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Event',
+      start: DateTime.tryParse(json['startsAt']?.toString() ?? '') ?? DateTime.now(),
+      end: DateTime.tryParse(json['endsAt']?.toString() ?? ''),
+      description: json['description']?.toString() ?? '',
+      location: (venue?.isNotEmpty ?? false)
+          ? venue!
+          : (address?.isNotEmpty ?? false)
+              ? address!
+              : 'Gurugram',
+      city: json['city']?.toString() ?? 'Gurugram',
+      lat: (json['lat'] as num?)?.toDouble(),
+      lng: (json['lng'] as num?)?.toDouble(),
+      price: json['priceRaw']?.toString() ?? 'See source',
+      url: json['url']?.toString() ?? '',
+      source: json['source']?.toString() ?? 'Luma',
+      geocoded: json['geocodeQuality']?.toString(),
+      verdictBand: json['verdictBand']?.toString(),
+      verdictFormat: json['verdictFormat']?.toString(),
+      hasVerdict: json['hasVerdict'] == true,
+    );
+  }
+
   EventItem copyWith({int? fitPercent}) => EventItem(
         id: id,
         title: title,
@@ -77,5 +118,8 @@ class EventItem {
         source: source,
         geocoded: geocoded,
         fitPercent: fitPercent ?? this.fitPercent,
+        verdictBand: verdictBand,
+        verdictFormat: verdictFormat,
+        hasVerdict: hasVerdict,
       );
 }

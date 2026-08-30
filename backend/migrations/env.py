@@ -4,13 +4,16 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from core.config import get_settings
-from core.db import Base
+from core.db import Base, ensure_sqlite_dir
 from core.models import *  # noqa: F403
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Alembic builds its own engine, so the SQLite parent directory has to be
+# created here too - configure_engine() is never called on this path.
+ensure_sqlite_dir(get_settings().sqlalchemy_url)
 config.set_main_option("sqlalchemy.url", get_settings().sqlalchemy_url)
 target_metadata = Base.metadata
 

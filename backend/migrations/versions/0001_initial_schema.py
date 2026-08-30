@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-08-30
 """
 
+import sqlalchemy as sa
 from alembic import op
 
 revision = "0001_initial"
@@ -13,8 +14,42 @@ branch_labels = None
 depends_on = None
 
 
+SEED_SOURCES = [
+    ("luma", "Luma", {"url": "https://lu.ma/gurugram"}),
+    ("meetup", "Meetup", {"url": "https://www.meetup.com/find/in--gurgaon/"}),
+    ("community", "CommunityMeetups", {"url": "https://lu.ma/CommunityMeetups"}),
+]
+
+
+def _upgrade_portable(bind) -> None:
+    """Schema for non-Postgres backends (SQLite).
+
+    Built from the ORM models rather than hand-written DDL, so the two can
+    never drift. The Postgres path below keeps its explicit SQL because it
+    carries things the models cannot express portably - notably the
+    ``jsonb_array_length(evidence) > 0`` check and the trigram indexes.
+    """
+    from core.db import Base
+    from core import models  # noqa: F401  (registers the tables on Base)
+
+    Base.metadata.create_all(bind)
+    sources = Base.metadata.tables["sources"]
+    existing = {row[0] for row in bind.execute(sa.select(sources.c.id))}
+    rows = [
+        {"id": sid, "display_name": name, "enabled": True, "config": config}
+        for sid, name, config in SEED_SOURCES
+        if sid not in existing
+    ]
+    if rows:
+        bind.execute(sources.insert(), rows)
+
+
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        _upgrade_portable(bind)
+        return
+
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     op.execute(
         """
@@ -36,7 +71,7 @@ def upgrade() -> None:
           socials           jsonb NOT NULL DEFAULT '[]'::jsonb,
           profile_summary   text,
           profile_evidence  jsonb NOT NULL DEFAULT '[]'::jsonb,
-          embedding         vector(1536),
+          embedding         jsonb,
           first_seen_at     timestamptz NOT NULL DEFAULT now(),
           last_seen_at      timestamptz NOT NULL DEFAULT now(),
           UNIQUE (source_id, source_ref)
@@ -55,13 +90,12 @@ def upgrade() -> None:
           typical_attendance int,
           summary            text,
           evidence           jsonb NOT NULL DEFAULT '[]'::jsonb,
-          embedding          vector(1536),
+          embedding          jsonb,
           editions_count     int NOT NULL DEFAULT 0,
           first_seen_at      timestamptz NOT NULL DEFAULT now(),
           last_seen_at       timestamptz NOT NULL DEFAULT now()
         );
         CREATE INDEX series_key_trgm ON series USING gin (normalized_key gin_trgm_ops);
-        CREATE INDEX series_embedding ON series USING hnsw (embedding vector_cosine_ops);
 
         CREATE TABLE events (
           id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -84,14 +118,13 @@ def upgrade() -> None:
           city             text NOT NULL DEFAULT 'Gurugram',
           status           text NOT NULL DEFAULT 'upcoming',
           raw              jsonb NOT NULL,
-          embedding        vector(1536),
+          embedding        jsonb,
           first_seen_at    timestamptz NOT NULL DEFAULT now(),
           last_seen_at     timestamptz NOT NULL DEFAULT now(),
           UNIQUE (source_id, source_event_id)
         );
         CREATE INDEX events_starts_at ON events (starts_at);
         CREATE INDEX events_series ON events (series_id);
-        CREATE INDEX events_embedding ON events USING hnsw (embedding vector_cosine_ops);
 
         CREATE TABLE event_enrichment (
           event_id          uuid PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
@@ -129,10 +162,9 @@ def upgrade() -> None:
           source_type  text NOT NULL,
           source_url   text,
           content      text NOT NULL,
-          embedding    vector(1536) NOT NULL,
+          embedding    jsonb NOT NULL,
           created_at   timestamptz NOT NULL DEFAULT now()
         );
-        CREATE INDEX event_chunks_embedding ON event_chunks USING hnsw (embedding vector_cosine_ops);
         CREATE INDEX event_chunks_event ON event_chunks (event_id);
 
         CREATE TABLE event_similarity (
@@ -205,6 +237,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        from core.db import Base
+        from core import models  # noqa: F401
+
+        Base.metadata.drop_all(bind)
+        return
+
     op.execute(
         """
         DROP TABLE IF EXISTS ingest_runs;
