@@ -62,7 +62,8 @@ def _from_luma_api(raw: dict[str, Any]) -> DiscoveredEvent | None:
     if not url.startswith("http"):
         return None
     location = first(geo.get("full_address"), geo.get("city"), raw.get("location"))
-    city = first(geo.get("city"), "Gurugram")
+    # See community_meetups: a defaulted city defeats the city filter.
+    city = first(geo.get("city"))
     lat = number_of(geo.get("latitude"), raw.get("lat"))
     lng = number_of(geo.get("longitude"), raw.get("lng"))
     lat, lng, quality = classify_geocode(lat, lng, location, city)

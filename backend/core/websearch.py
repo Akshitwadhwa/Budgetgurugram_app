@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.config import get_settings
@@ -32,6 +33,7 @@ class FetchedPage:
     title: str
     content: str
     content_hash: str
+    description: str = ""
 
 
 def _hash(content: str) -> str:
@@ -95,7 +97,17 @@ def fetch_page(url: str) -> FetchedPage | None:
     title, content = html_to_text(response.content)
     if not content:
         return None
-    return FetchedPage(url=str(response.url), title=title, content=content, content_hash=_hash(content))
+    # Extracted here because the bytes are already in hand; asking for it later
+    # would mean fetching the same page a second time.
+    from worker.sources.parse import extract_description
+
+    return FetchedPage(
+        url=str(response.url),
+        title=title,
+        content=content,
+        content_hash=_hash(content),
+        description=extract_description(response.content),
+    )
 
 
 def cache_document(session: Session, page: FetchedPage) -> WebDocument:
@@ -125,5 +137,23 @@ def cache_document(session: Session, page: FetchedPage) -> WebDocument:
         content_hash=page.content_hash,
         fetched_at=now,
     )
-    session.add(doc)
-    return doc
+
+    # Insert inside a savepoint and flush immediately. Two reasons:
+    #
+    #  * The row becomes visible to later SELECTs in this transaction, so the
+    #    duplicate is caught here rather than blowing up the whole batch at
+    #    commit time - one repeated URL used to lose every document and every
+    #    verdict for that event.
+    #  * If a unique violation still happens (a redirect collapsing two URLs
+    #    onto one, a concurrent worker), only the savepoint rolls back and we
+    #    fall back to the row that is already there.
+    try:
+        with session.begin_nested():
+            session.add(doc)
+            session.flush()
+        return doc
+    except IntegrityError:
+        conflicting = session.scalar(select(WebDocument).where(WebDocument.url == page.url))
+        if conflicting is not None:
+            return conflicting
+        raise

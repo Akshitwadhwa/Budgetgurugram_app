@@ -50,15 +50,14 @@ def _from_schema(raw: dict[str, Any]) -> DiscoveredEvent | None:
         return None
     location = raw.get("location") or {}
     address = location.get("address") if isinstance(location, dict) else {}
+    # See community_meetups: a defaulted city defeats the city filter.
     city = first(
         address.get("addressLocality") if isinstance(address, dict) else "",
         location.get("name") if isinstance(location, dict) else "",
-        "Gurugram",
     )
     label = first(
         location.get("name") if isinstance(location, dict) else "",
         address.get("streetAddress") if isinstance(address, dict) else "",
-        city,
     )
     geo = location.get("geo") if isinstance(location, dict) else {}
     lat = number_of(geo.get("latitude") if isinstance(geo, dict) else None)

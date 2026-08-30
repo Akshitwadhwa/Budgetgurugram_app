@@ -11,6 +11,7 @@ from core.config import get_settings
 from core.embeddings import embed_texts
 from core.llm import LlmError
 from core.models import Event, EventChunk, IngestRun, Organizer, Series
+from core.relevance import is_about_event
 from core.websearch import SearchHit, cache_document, fetch_page, search_web
 
 log = logging.getLogger(__name__)
@@ -96,10 +97,22 @@ def research_event(session: Session, event: Event, run: IngestRun | None = None)
         queries.append(f"{organizer.name} {city} events")
     queries.append(f'"{title}" {city} recap')
 
+    def keep(page) -> None:
+        if page is None:
+            return
+        try:
+            documents.append(cache_document(session, page))
+        except Exception:
+            log.warning("could not cache %s; continuing without it", page.url)
+
     documents = []
     listing = fetch_page(event.url)
-    if listing:
-        documents.append(cache_document(session, listing))
+    keep(listing)
+    # Neither source supplies a description at discover time, so fill it from
+    # the listing page we just fetched. Only when empty - never overwrite a
+    # description a source did provide.
+    if listing is not None and listing.description and not event.description_raw:
+        event.description_raw = listing.description
 
     # The organiser's own page is fetched directly rather than searched for.
     # Previously the bare hostname ("www.meetup.com") was used as a search
@@ -107,9 +120,7 @@ def research_event(session: Session, event: Event, run: IngestRun | None = None)
     if organizer and organizer.url:
         parsed = urlparse(organizer.url)
         if parsed.scheme in {"http", "https"} and parsed.hostname:
-            page = fetch_page(organizer.url)
-            if page:
-                documents.append(cache_document(session, page))
+            keep(fetch_page(organizer.url))
 
     terms = _tokens(title) | (_tokens(organizer.name) if organizer else set())
     for query in queries:
@@ -117,9 +128,7 @@ def research_event(session: Session, event: Event, run: IngestRun | None = None)
             if not is_relevant(hit, terms, city_terms):
                 log.info("dropped irrelevant result for %r: %s", query, hit.url)
                 continue
-            page = fetch_page(hit.url)
-            if page:
-                documents.append(cache_document(session, page))
+            keep(fetch_page(hit.url))
 
     past = []
     if event.series_id:
@@ -131,7 +140,22 @@ def research_event(session: Session, event: Event, run: IngestRun | None = None)
     if event.description_raw:
         for part in chunk_text(event.description_raw):
             chunks.append(("description", event.url, part))
+
+    # Only pages that are about *this event* become citable. A page that merely
+    # shares the topic yields quotes that are real, verifiable and irrelevant -
+    # the failure mode that survives every grounding check.
     for doc in documents:
+        citable, reason = is_about_event(
+            doc_url=doc.url,
+            doc_text=doc.content,
+            event_url=event.url,
+            event_title=title,
+            organizer_name=organizer.name if organizer else None,
+            organizer_url=organizer.url if organizer else None,
+        )
+        if not citable:
+            log.info("not citable for %r: %s (%s)", event.title[:40], doc.url, reason)
+            continue
         for part in chunk_text(doc.content):
             chunks.append(("web_doc", doc.url, part))
     for past_event in past:

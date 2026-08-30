@@ -8,6 +8,7 @@ from core.geo import classify_geocode, is_gurugram_event
 from worker.sources.base import DiscoveredEvent
 from worker.sources.parse import (
     collect_events,
+    canonical_luma_url,
     find_luma_urls,
     first,
     number_of,
@@ -83,16 +84,22 @@ def _meta(html: str, property_name: str) -> str:
 def _from_schema(raw: dict[str, Any], page_url: str) -> DiscoveredEvent | None:
     title = first(raw.get("name"), raw.get("title"))
     starts = parse_dt(raw.get("startDate") or raw.get("start_at") or raw.get("start_time"))
-    url = first(raw.get("url"), page_url)
+    # Luma's API returns `url` as a bare slug ("m0o37oik"), not a URL. Stored
+    # raw it produced un-fetchable rows ("Request URL is missing an
+    # 'http://' or 'https://' protocol") that also duplicated the real event,
+    # because source_event_id is derived from this value.
+    url = canonical_luma_url(first(raw.get("url"), page_url), page_url)
     if not title or not starts or not url:
         return None
     location = raw.get("location") or {}
     address = location.get("address") if isinstance(location, dict) else {}
-    city = first(address.get("addressLocality") if isinstance(address, dict) else "", "Gurugram")
+    # No "Gurugram" fallback. A defaulted city short-circuits is_gurugram_event
+    # on its first line, so fabricating one here disabled the city filter for
+    # every event this source produced.
+    city = first(address.get("addressLocality") if isinstance(address, dict) else "")
     label = first(
         location.get("name") if isinstance(location, dict) else "",
         address.get("streetAddress") if isinstance(address, dict) else "",
-        city,
     )
     geo = location.get("geo") if isinstance(location, dict) else {}
     lat = number_of(geo.get("latitude") if isinstance(geo, dict) else None)

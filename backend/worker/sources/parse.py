@@ -124,3 +124,49 @@ def collect_events(value: Any, output: list[dict] | None = None) -> list[dict]:
         if isinstance(item, (dict, list)):
             collect_events(item, output)
     return output
+
+
+def extract_description(html: str | bytes) -> str:
+    """Pull an event description out of a listing page.
+
+    Neither source gives us one at discover time: Meetup's JSON-LD carries an
+    empty ``description`` string, and Luma's paginated discover API omits the
+    field entirely. The text does exist on the event page itself, so this reads
+    it from there.
+
+    Order matters - JSON-LD first because it is the fullest (Luma's meta tags
+    are truncated with an ellipsis), then the Open Graph and meta fallbacks.
+
+    Meetup renders its long description client-side, so only the ~200-character
+    ``og:description`` is reachable without a headless browser. That is a real
+    limit, not a bug to keep chasing; enrichment separately gets the full page
+    text via web_documents.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    best = ""
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "{}")
+        except (ValueError, TypeError):
+            continue
+        for item in data if isinstance(data, list) else [data]:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("@type", "")).endswith("Event") or item.get("@type") == "Event":
+                candidate = text_of(item.get("description"))
+                if len(candidate) > len(best):
+                    best = candidate
+    if best:
+        return best[:4000]
+
+    for finder in (
+        lambda: soup.find("meta", property="og:description"),
+        lambda: soup.find("meta", attrs={"name": "description"}),
+    ):
+        tag = finder()
+        if tag is not None:
+            candidate = text_of(tag.get("content"))
+            if candidate:
+                return candidate[:4000]
+    return ""

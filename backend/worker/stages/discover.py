@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core.city_filter import city_verdict
+from core.config import get_settings
 from core.models import Event, IngestRun, Organizer, Source
 from core.title_normalize import normalize_name
 from worker.guards import evaluate_zero_result
@@ -41,7 +43,39 @@ def discover_source(session: Session, source: Source) -> IngestRun:
         run.errors = [str(exc)]
         return run
 
+    # The city gate. `DiscoveredEvent.city` defaults to the target city and is
+    # never verified by the sources, so without this an all-India calendar files
+    # Bengaluru and Mumbai events as Gurugram - and they reach paid enrichment.
+    settings = get_settings()
+    kept: list[DiscoveredEvent] = []
+    rejected: list[str] = []
+    for item in found_events:
+        keep, reason = city_verdict(
+            title=item.title,
+            location=" ".join(
+                part for part in (item.venue_name, item.address) if part
+            ),
+            lat=item.lat,
+            lng=item.lng,
+            geocode_quality=item.geocode_quality,
+            city_slugs=settings.city_slug_list,
+            bbox=settings.bbox,
+        )
+        if keep:
+            kept.append(item)
+        else:
+            rejected.append(f"{item.title}: {reason}")
+            log.info("rejected %r - %s", item.title, reason)
+
+    # events_found stays the raw source count so the zero-result guard keeps
+    # answering "did the scraper work?" rather than "did anything pass the
+    # filter?" - those are different failures and must not be conflated.
     found = len(found_events)
+    if rejected:
+        run.errors = list(run.errors or []) + [
+            f"filtered out {len(rejected)} out-of-city event(s)"
+        ]
+    found_events = kept
     previous = last_successful_found(session, source.id)
     guard = evaluate_zero_result(found, previous)
     run.events_found = found

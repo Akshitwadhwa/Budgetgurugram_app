@@ -72,6 +72,52 @@ In another terminal:
 python -m worker.run
 ```
 
+## Producing verdicts
+
+The scheduled worker (`python -m worker.run`) enriches everything it finds.
+For the first run against a new prompt or model, use the bounded batch instead —
+it caps how many events are processed and reports what they cost:
+
+```bash
+python -m worker.enrich_batch --limit 3            # small paid batch
+python -m worker.enrich_batch --limit 3 --dry-run  # research + embed only, no paid verdict
+python -m worker.enrich_batch --limit 40           # the rest
+```
+
+Measured cost: **~$0.009 per verdict** on `gpt-5.6-terra` (~1-3k tokens in,
+~0.5k out). Enriching an entire 36-event Gurugram window is well under $0.50.
+
+### What each key buys you
+
+| Key | Without it | With it |
+|---|---|---|
+| `OPENAI_API_KEY` | No verdicts at all. | Verdicts + embeddings. |
+| `SEARCH_API_KEY` (Tavily) | Research falls back to the event's own listing page only. Verdicts still work and are correctly sourced, but they can only ever *agree* with the listing. | Organiser sites, recaps and coverage become citable. |
+
+That second row is the important one. The product's differentiating claim -
+catching a listing that misrepresents itself - is **structurally impossible**
+without web search, because the listing cannot contradict itself. Expect mostly
+`unclear` and listing-echoing verdicts on an OpenAI-only setup.
+
+### Model IDs
+
+`gpt-5.6` and `gpt-5.6-mini` do **not** exist. The real tiers are
+`gpt-5.6-sol`, `gpt-5.6-terra` and `gpt-5.6-luna`. Verify against the account
+before changing them:
+
+```bash
+python -c "from openai import OpenAI; from core.config import get_settings; print([m.id for m in OpenAI(api_key=get_settings().openai_api_key).models.list() if m.id.startswith('gpt-5.6')])"
+```
+
+## Exporting a readable copy
+
+SQLite is the engine; `export.json` is the human-readable view.
+
+```bash
+python -m worker.export_json                      # -> data/export.json
+python -m worker.export_json --include-embeddings # very large; rarely wanted
+```
+
 One-off history backfill (partial is acceptable):
 
 ```bash

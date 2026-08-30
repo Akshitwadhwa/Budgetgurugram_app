@@ -4,6 +4,7 @@ import json
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.confidence import should_escalate
@@ -95,7 +96,11 @@ def enrich_event(session: Session, event: Event, run: IngestRun | None = None, r
         _log_run_error(run, f"enrichment rejected for {event.id}: {exc}")
         if retry:
             try:
-                return _enrich_once(session, event)
+                # Retry with the rejection reason. The previous implementation
+                # re-sent an identical prompt, so a model that paraphrased a
+                # quote simply paraphrased it again - half the verdicts were
+                # lost to a retry that could not learn anything.
+                return _enrich_once(session, event, correction=str(exc))
             except (EnrichmentRejected, LlmError) as retry_exc:
                 _log_run_error(run, f"enrichment retry failed for {event.id}: {retry_exc}")
                 return False
@@ -105,7 +110,14 @@ def enrich_event(session: Session, event: Event, run: IngestRun | None = None, r
         return False
 
 
-def _enrich_once(session: Session, event: Event) -> bool:
+def _enrich_once(session: Session, event: Event, correction: str | None = None) -> bool:
+    # Idempotence guard. Enrichment is expensive and the caller may retry after
+    # an unrelated failure, so inserting blindly risks a unique violation on
+    # event_id that aborts the whole transaction - taking unrelated work with it.
+    if session.get(EventEnrichment, event.id) is not None:
+        log.info("event %s already has a verdict; skipping", event.id)
+        return False
+
     chunks = session.scalars(select(EventChunk).where(EventChunk.event_id == event.id)).all()
     docs = []
     urls = {chunk.source_url for chunk in chunks if chunk.source_url}
@@ -150,6 +162,20 @@ def _enrich_once(session: Session, event: Event) -> bool:
         }
     )
 
+    if correction:
+        user = json.dumps(
+            {
+                "previous_attempt_was_rejected": correction,
+                "instruction": (
+                    "Your last answer was discarded. Copy every quote "
+                    "character-for-character from the source text below - no "
+                    "paraphrasing, no ellipsis, no tidying. Prefer a short "
+                    "contiguous run you can copy exactly."
+                ),
+                **json.loads(user),
+            }
+        )
+
     settings = get_settings()
     result = complete_structured(
         prompt_name="enrich.md",
@@ -176,7 +202,15 @@ def _enrich_once(session: Session, event: Event) -> bool:
         tokens_in=result.tokens_in,
         tokens_out=result.tokens_out,
     )
-    session.add(row)
+    # Savepoint so a losing race writes nothing rather than poisoning the
+    # surrounding transaction.
+    try:
+        with session.begin_nested():
+            session.add(row)
+            session.flush()
+    except IntegrityError:
+        log.info("verdict for %s was written concurrently; keeping the existing one", event.id)
+        return False
     return True
 
 

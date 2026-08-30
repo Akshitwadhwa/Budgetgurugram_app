@@ -14,7 +14,7 @@
 class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'http://10.10.27.165:8000',
   );
 
   static const eventsPath = '/v1/events';
