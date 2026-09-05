@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/home_shell.dart';
+import 'screens/city_intro_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'state/app_state.dart';
 import 'state/theme_controller.dart';
@@ -45,8 +46,15 @@ class BudgetGurugramApp extends StatelessWidget {
   }
 }
 
-class _Root extends StatelessWidget {
+class _Root extends StatefulWidget {
   const _Root();
+
+  @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> {
+  bool _introViewed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +64,12 @@ class _Root extends StatelessWidget {
       child: state.loading
           ? const _Boot()
           : state.onboarded
-              ? const HomeShell()
-              : const OnboardingScreen(),
+          ? const HomeShell()
+          : _introViewed
+          ? const OnboardingScreen()
+          : CityIntroScreen(
+              onComplete: () => setState(() => _introViewed = true),
+            ),
     );
   }
 }
